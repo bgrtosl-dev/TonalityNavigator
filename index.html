@@ -142,8 +142,11 @@
     <div class="section-label">🎵 Major Scale</div>
     <div id="major-score" class="score-box"></div>
 
-    <div class="section-label">🎵 Minor Scales (Melodic & Harmonic)</div>
-    <div id="minor-score" class="score-box"></div>
+    <div class="section-label">🎵 Melodic Minor Scale</div>
+    <div id="melodic-minor-score" class="score-box"></div>
+
+    <div class="section-label">🎵 Harmonic Minor Scale</div>
+    <div id="harmonic-minor-score" class="score-box"></div>
 
     <div class="section-label">🎹 Cadences</div>
     <div id="cadences-score" class="score-box"></div>
@@ -390,7 +393,8 @@
         return {
             key_sig: majName,
             maj_title: `${majName} Major Scale`,
-            min_title: `${minName} Minor Scale`,
+            min_melodic_title: `${minName} Melodic Minor Scale`,
+            min_harmonic_title: `${minName} Harmonic Minor Scale`,
             maj_scale: majScale,
             min_up: minUp,
             min_down: minDown,
@@ -403,7 +407,7 @@
     // VEXFLOW DRAWING LOGIC
     // =========================================================================
 
-    function drawBeamedMeasure(ctx, stave, notesData, scaleTitle) {
+    function drawBeamedMeasure(ctx, stave, notesData, scaleTitle="") {
         const { StaveNote, Accidental, Voice, Formatter, Beam } = Vex.Flow;
 
         const notes = notesData.map(item => {
@@ -442,11 +446,13 @@
         });
         ctx.restore();
 
-        const titleY = stave.getYForLine(11.8);
-        ctx.save();
-        ctx.setFont("sans-serif", 12, "bold");
-        ctx.fillText(scaleTitle, stave.getX() + 10, titleY);
-        ctx.restore();
+        if (scaleTitle) {
+            const titleY = stave.getYForLine(11.8);
+            ctx.save();
+            ctx.setFont("sans-serif", 12, "bold");
+            ctx.fillText(scaleTitle, stave.getX() + 10, titleY);
+            ctx.restore();
+        }
     }
 
     function drawCadenceRow(ctx, cadenceData, startY, modeLabel, keySig, availWidth) {
@@ -486,7 +492,6 @@
 
                 const voice = new Vex.Flow.Voice({ num_beats: 8, beat_value: 4 }).setStrict(false).addTickables(chords);
                 
-                // Formatting width adjusted for tighter chord spacing
                 const availableFormatWidth = barWidth - CONFIG.CADENCE_CHORD_FORMAT_OFFSET;
                 new Vex.Flow.Formatter().joinVoices([voice]).format([voice], Math.max(availableFormatWidth, 40));
                 voice.draw(ctx, stave);
@@ -542,28 +547,37 @@
         const sMaj = new Vex.Flow.Stave(10, 15, scaleWidth);
         sMaj.addClef("treble").addKeySignature(data.key_sig);
         sMaj.setContext(ctx1).draw();
-        drawBeamedMeasure(ctx1, sMaj, data.maj_scale, `${data.maj_title} (Ascending)`);
+        drawBeamedMeasure(ctx1, sMaj, data.maj_scale, data.maj_title);
 
-        // 2. Minor Scale
-        const minDiv = document.getElementById("minor-score");
-        if (!minDiv) return;
-        minDiv.innerHTML = "";
+        // 2. Melodic Minor Scale Block
+        const melDiv = document.getElementById("melodic-minor-score");
+        if (melDiv) {
+            melDiv.innerHTML = "";
+            const rendererMel = new Vex.Flow.Renderer(melDiv, Vex.Flow.Renderer.Backends.SVG);
+            rendererMel.resize(availWidth, 160);
+            const ctxMel = rendererMel.getContext();
 
-        const renderer2 = new Vex.Flow.Renderer(minDiv, Vex.Flow.Renderer.Backends.SVG);
-        renderer2.resize(availWidth, 360);
-        const ctx2 = renderer2.getContext();
+            const sMel = new Vex.Flow.Stave(10, 15, scaleWidth);
+            sMel.addClef("treble").addKeySignature(data.key_sig);
+            sMel.setContext(ctxMel).draw();
+            drawBeamedMeasure(ctxMel, sMel, data.min_up, data.min_melodic_title);
+        }
 
-        const sMin1 = new Vex.Flow.Stave(10, 15, scaleWidth);
-        sMin1.addClef("treble").addKeySignature(data.key_sig);
-        sMin1.setContext(ctx2).draw();
-        drawBeamedMeasure(ctx2, sMin1, data.min_up, `${data.min_title} (Melodic Up)`);
+        // 3. Harmonic Minor Scale Block
+        const harDiv = document.getElementById("harmonic-minor-score");
+        if (harDiv) {
+            harDiv.innerHTML = "";
+            const rendererHar = new Vex.Flow.Renderer(harDiv, Vex.Flow.Renderer.Backends.SVG);
+            rendererHar.resize(availWidth, 160);
+            const ctxHar = rendererHar.getContext();
 
-        const sMin2 = new Vex.Flow.Stave(10, 190, scaleWidth);
-        sMin2.addClef("treble").addKeySignature(data.key_sig);
-        sMin2.setContext(ctx2).draw();
-        drawBeamedMeasure(ctx2, sMin2, data.min_down, `${data.min_title} (Harmonic Down)`);
+            const sHar = new Vex.Flow.Stave(10, 15, scaleWidth);
+            sHar.addClef("treble").addKeySignature(data.key_sig);
+            sHar.setContext(ctxHar).draw();
+            drawBeamedMeasure(ctxHar, sHar, data.min_down, data.min_harmonic_title);
+        }
 
-        // 3. Cadences
+        // 4. Cadences
         const cadDiv = document.getElementById("cadences-score");
         if (!cadDiv) return;
         cadDiv.innerHTML = "";
