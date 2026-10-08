@@ -489,52 +489,38 @@
         if (!majDiv) return;
         majDiv.innerHTML = "";
         const availWidth = Math.max(majDiv.clientWidth - 10, 320);
-        const halfWidth = Math.floor((availWidth - 30) / 2);
+        
+        // Full width scale stave (doubled from halfWidth for ample note spacing)
+        const scaleWidth = availWidth - 20;
 
         // 1. Major Scale
         const renderer1 = new Vex.Flow.Renderer(majDiv, Vex.Flow.Renderer.Backends.SVG);
         renderer1.resize(availWidth, 160);
         const ctx1 = renderer1.getContext();
 
-        const sMaj = new Vex.Flow.Stave(10, 15, halfWidth);
+        const sMaj = new Vex.Flow.Stave(10, 15, scaleWidth);
         sMaj.addClef("treble").addKeySignature(data.key_sig);
         sMaj.setContext(ctx1).draw();
         drawBeamedMeasure(ctx1, sMaj, data.maj_scale, `${data.maj_title} (Ascending)`);
 
-        // 2. Minor Scale (Expanded vertical height and stave offset to prevent collision)
+        // 2. Minor Scale (Full width staves for Melodic and Harmonic lines)
         const minDiv = document.getElementById("minor-score");
         if (!minDiv) return;
         minDiv.innerHTML = "";
 
-        const stackMinorTwoLines = availWidth < 850;
-        const minHeight = stackMinorTwoLines ? 360 : 160;
-
         const renderer2 = new Vex.Flow.Renderer(minDiv, Vex.Flow.Renderer.Backends.SVG);
-        renderer2.resize(availWidth, minHeight);
+        renderer2.resize(availWidth, 360);
         const ctx2 = renderer2.getContext();
 
-        if (stackMinorTwoLines) {
-            const sMin1 = new Vex.Flow.Stave(10, 15, halfWidth);
-            sMin1.addClef("treble").addKeySignature(data.key_sig);
-            sMin1.setContext(ctx2).draw();
-            drawBeamedMeasure(ctx2, sMin1, data.min_up, `${data.min_title} (Melodic Up)`);
+        const sMin1 = new Vex.Flow.Stave(10, 15, scaleWidth);
+        sMin1.addClef("treble").addKeySignature(data.key_sig);
+        sMin1.setContext(ctx2).draw();
+        drawBeamedMeasure(ctx2, sMin1, data.min_up, `${data.min_title} (Melodic Up)`);
 
-            // Offset updated to 190 to clear title text completely
-            const sMin2 = new Vex.Flow.Stave(10, 190, halfWidth);
-            sMin2.addClef("treble").addKeySignature(data.key_sig);
-            sMin2.setContext(ctx2).draw();
-            drawBeamedMeasure(ctx2, sMin2, data.min_down, `${data.min_title} (Harmonic Down)`);
-        } else {
-            const sMin1 = new Vex.Flow.Stave(10, 15, halfWidth);
-            sMin1.addClef("treble").addKeySignature(data.key_sig);
-            sMin1.setContext(ctx2).draw();
-            drawBeamedMeasure(ctx2, sMin1, data.min_up, `${data.min_title} (Melodic Up)`);
-
-            const sMin2 = new Vex.Flow.Stave(20 + halfWidth, 15, halfWidth);
-            sMin2.addClef("treble").addKeySignature(data.key_sig);
-            sMin2.setContext(ctx2).draw();
-            drawBeamedMeasure(ctx2, sMin2, data.min_down, `${data.min_title} (Harmonic Down)`);
-        }
+        const sMin2 = new Vex.Flow.Stave(10, 190, scaleWidth);
+        sMin2.addClef("treble").addKeySignature(data.key_sig);
+        sMin2.setContext(ctx2).draw();
+        drawBeamedMeasure(ctx2, sMin2, data.min_down, `${data.min_title} (Harmonic Down)`);
 
         // 3. Cadences
         const cadDiv = document.getElementById("cadences-score");
