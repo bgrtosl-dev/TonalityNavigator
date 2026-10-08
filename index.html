@@ -198,7 +198,7 @@
 
     // Layout & Rendering Settings
     const CONFIG = {
-        SCALE_BOX_HEIGHT: 175,            // SVG canvas height for scale staves
+        SCALE_BOX_HEIGHT: 185,            // Increased SVG canvas height to prevent truncation of line 2
         CADENCE_MAX_BAR_WIDTH: 250,      // Max staff length for cadences
         CADENCE_ROW_HEIGHT: 185,          // Vertical space between cadence rows
         CADENCE_COL_GAP: 24,              // Horizontal gap between cadence columns
@@ -393,9 +393,6 @@
 
         return {
             key_sig: majName,
-            maj_title: `${majName} Major Scale`,
-            min_melodic_title: `${minName} Melodic Minor Scale`,
-            min_harmonic_title: `${minName} Harmonic Minor Scale`,
             maj_scale: majScale,
             min_up: minUp,
             min_down: minDown,
@@ -408,7 +405,7 @@
     // VEXFLOW DRAWING LOGIC
     // =========================================================================
 
-    function drawBeamedMeasure(ctx, stave, notesData, scaleTitle="") {
+    function drawBeamedMeasure(ctx, stave, notesData) {
         const { StaveNote, Accidental, Voice, Formatter, Beam } = Vex.Flow;
 
         const notes = notesData.map(item => {
@@ -434,33 +431,25 @@
         voice.draw(ctx, stave);
         beam.setContext(ctx).draw();
 
-        // Single line for triads, staggered across 2 lines when 7th chords are shown
+        // Line positions for scale degree labels
         const triadY1 = stave.getYForLine(9.0);
         const triadY2 = stave.getYForLine(10.4);
 
         ctx.save();
         ctx.setFont("sans-serif", 11, "bold");
+        ctx.textAlign = "center"; // Precise horizontal center alignment on the note head
         notes.forEach((note, i) => {
             if (notesData[i].triad) {
                 const text = notesData[i].triad;
                 const x = note.getAbsoluteX();
-                const offset = text.length * 3;
 
                 // Stagger even/odd notes ONLY when 7th chords are active
                 const currentY = (showSevenths && i % 2 !== 0) ? triadY2 : triadY1;
 
-                ctx.fillText(text, x - offset, currentY);
+                ctx.fillText(text, x, currentY);
             }
         });
         ctx.restore();
-
-        if (scaleTitle) {
-            const titleY = stave.getYForLine(12.0);
-            ctx.save();
-            ctx.setFont("sans-serif", 12, "bold");
-            ctx.fillText(scaleTitle, stave.getX() + 10, titleY);
-            ctx.restore();
-        }
     }
 
     function drawCadenceRow(ctx, cadenceData, startY, modeLabel, keySig, availWidth) {
@@ -507,12 +496,12 @@
                 const labelY = stave.getYForLine(11.2);
                 ctx.save();
                 ctx.setFont("sans-serif", 10, "bold");
+                ctx.textAlign = "center"; // Precise center alignment on chord stems
                 chords.forEach((chord, i) => {
                     if (cadenceData[idx][i].label) {
                         const text = cadenceData[idx][i].label;
                         const x = chord.getAbsoluteX();
-                        const offset = text.length * 2.5;
-                        ctx.fillText(text, x - offset, labelY);
+                        ctx.fillText(text, x, labelY);
                     }
                 });
                 ctx.restore();
@@ -555,7 +544,7 @@
         const sMaj = new Vex.Flow.Stave(10, 15, scaleWidth);
         sMaj.addClef("treble").addKeySignature(data.key_sig);
         sMaj.setContext(ctx1).draw();
-        drawBeamedMeasure(ctx1, sMaj, data.maj_scale, data.maj_title);
+        drawBeamedMeasure(ctx1, sMaj, data.maj_scale);
 
         // 2. Melodic Minor Scale Block
         const melDiv = document.getElementById("melodic-minor-score");
@@ -568,7 +557,7 @@
             const sMel = new Vex.Flow.Stave(10, 15, scaleWidth);
             sMel.addClef("treble").addKeySignature(data.key_sig);
             sMel.setContext(ctxMel).draw();
-            drawBeamedMeasure(ctxMel, sMel, data.min_up, data.min_melodic_title);
+            drawBeamedMeasure(ctxMel, sMel, data.min_up);
         }
 
         // 3. Harmonic Minor Scale Block
@@ -582,7 +571,7 @@
             const sHar = new Vex.Flow.Stave(10, 15, scaleWidth);
             sHar.addClef("treble").addKeySignature(data.key_sig);
             sHar.setContext(ctxHar).draw();
-            drawBeamedMeasure(ctxHar, sHar, data.min_down, data.min_harmonic_title);
+            drawBeamedMeasure(ctxHar, sHar, data.min_down);
         }
 
         // 4. Cadences
