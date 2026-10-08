@@ -198,6 +198,7 @@
 
     // Layout & Rendering Settings
     const CONFIG = {
+        SCALE_BOX_HEIGHT: 175,            // SVG canvas height for scale staves
         CADENCE_MAX_BAR_WIDTH: 250,      // Max staff length for cadences
         CADENCE_ROW_HEIGHT: 185,          // Vertical space between cadence rows
         CADENCE_COL_GAP: 24,              // Horizontal gap between cadence columns
@@ -433,7 +434,10 @@
         voice.draw(ctx, stave);
         beam.setContext(ctx).draw();
 
-        const triadY = stave.getYForLine(9.0);
+        // Single line for triads, staggered across 2 lines when 7th chords are shown
+        const triadY1 = stave.getYForLine(9.0);
+        const triadY2 = stave.getYForLine(10.4);
+
         ctx.save();
         ctx.setFont("sans-serif", 11, "bold");
         notes.forEach((note, i) => {
@@ -441,13 +445,17 @@
                 const text = notesData[i].triad;
                 const x = note.getAbsoluteX();
                 const offset = text.length * 3;
-                ctx.fillText(text, x - offset, triadY);
+
+                // Stagger even/odd notes ONLY when 7th chords are active
+                const currentY = (showSevenths && i % 2 !== 0) ? triadY2 : triadY1;
+
+                ctx.fillText(text, x - offset, currentY);
             }
         });
         ctx.restore();
 
         if (scaleTitle) {
-            const titleY = stave.getYForLine(11.8);
+            const titleY = stave.getYForLine(12.0);
             ctx.save();
             ctx.setFont("sans-serif", 12, "bold");
             ctx.fillText(scaleTitle, stave.getX() + 10, titleY);
@@ -541,7 +549,7 @@
 
         // 1. Major Scale
         const renderer1 = new Vex.Flow.Renderer(majDiv, Vex.Flow.Renderer.Backends.SVG);
-        renderer1.resize(availWidth, 160);
+        renderer1.resize(availWidth, CONFIG.SCALE_BOX_HEIGHT);
         const ctx1 = renderer1.getContext();
 
         const sMaj = new Vex.Flow.Stave(10, 15, scaleWidth);
@@ -554,7 +562,7 @@
         if (melDiv) {
             melDiv.innerHTML = "";
             const rendererMel = new Vex.Flow.Renderer(melDiv, Vex.Flow.Renderer.Backends.SVG);
-            rendererMel.resize(availWidth, 160);
+            rendererMel.resize(availWidth, CONFIG.SCALE_BOX_HEIGHT);
             const ctxMel = rendererMel.getContext();
 
             const sMel = new Vex.Flow.Stave(10, 15, scaleWidth);
@@ -568,7 +576,7 @@
         if (harDiv) {
             harDiv.innerHTML = "";
             const rendererHar = new Vex.Flow.Renderer(harDiv, Vex.Flow.Renderer.Backends.SVG);
-            rendererHar.resize(availWidth, 160);
+            rendererHar.resize(availWidth, CONFIG.SCALE_BOX_HEIGHT);
             const ctxHar = rendererHar.getContext();
 
             const sHar = new Vex.Flow.Stave(10, 15, scaleWidth);
