@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tonality & Cadence Navigator</title>
+
+    <!-- PWA & iOS Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tonality">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#2563eb">
+
+    <!-- VexFlow Library -->
+    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1f2937;
+            --primary-color: #2563eb;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 14px;
+            text-align: center;
+        }
+
+        .controls-card {
+            background: var(--card-bg);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        select, button {
+            font-size: 0.9rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            font-weight: 500;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .btn-shift {
+            background-color: #4b5563;
+            min-width: 40px;
+        }
+
+        .section-label {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-top: 16px;
+            margin-bottom: 6px;
+            color: var(--text-color);
+        }
+
+        .score-box {
+            width: 100%;
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 12px;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .score-box svg {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎼 Tonality, Scale & Cadence Navigator</h1>
+
+    <!-- Navigation Controls -->
+    <div class="controls-card">
+        <div class="control-group">
+            <label for="key-select"><strong>Key Signature:</strong></label>
+            <select id="key-select"></select>
+        </div>
+
+        <div class="control-group">
+            <button id="btn-m2" class="btn-shift">-2</button>
+            <button id="btn-m1" class="btn-shift">-1</button>
+            <button id="btn-p1" class="btn-shift">+1</button>
+            <button id="btn-p2" class="btn-shift">+2</button>
+        </div>
+
+        <div class="control-group">
+            <button id="btn-toggle-sevenths">Show 7th Chords</button>
+        </div>
+    </div>
+
+    <!-- Music Rendering Containers -->
+    <div class="section-label">🎵 Major Scale</div>
+    <div id="major-score" class="score-box"></div>
+
+    <div class="section-label">🎵 Minor Scales (Melodic & Harmonic)</div>
+    <div id="minor-score" class="score-box"></div>
+
+    <div class="section-label">🎹 Cadences</div>
+    <div id="cadences-score" class="score-box"></div>
+</div>
+
+<script>
+    const LETTERS = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
+
+    const KEY_NAMES = {
+        0: ["C", "A"], 1: ["G", "E"], 2: ["D", "B"], 3: ["A", "F#"],
+        4: ["E", "C#"], 5: ["B", "G#"], 6: ["F#", "D#"], 7: ["C#", "A#"],
+        "-1": ["F", "D"], "-2": ["Bb", "G"], "-3": ["Eb", "C"], "-4": ["Ab", "F"],
+        "-5": ["Db", "Bb"], "-6": ["Gb", "Eb"], "-7": ["Cb", "Ab"]
+    };
+
+    const SHARP_ORDER = [3, 0, 4, 1, 5, 2, 6];
+    const FLAT_ORDER = [6, 2, 5, 1, 4, 0, 3];
+
+    let currentAccidentals = 0;
+    let showSevenths = false;
+
+    function formatLabel(acc) {
+        const d = KEY_NAMES[acc];
+        const prefix = acc > 0 ? `${acc}#` : (acc < 0 ? `${Math.abs(acc)}b` : "0");
+        return `${prefix} (${d[0]} / ${d[1]}m)`;
+    }
+
+    function getKeySignatureAccidental(letterIdx, accCount) {
+        const lIdx = ((letterIdx % 7) + 7) % 7;
+        if (accCount > 0) {
+            if (SHARP_ORDER.slice(0, accCount).includes(lIdx)) return "#";
+        } else if (accCount < 0) {
+            if (FLAT_ORDER.slice(0, Math.abs(accCount)).includes(lIdx)) return "b";
+        }
+        return "";
+    }
+
+    function getRaisedAccidental(letterIdx, accCount) {
+        const keyAcc = getKeySignatureAccidental(letterIdx, accCount);
+        if (keyAcc === "b") return "n";
+        if (keyAcc === "") return "#";
+        if (keyAcc === "#") return "^^";
+        return "#";
+    }
+
+    function getLowestBOctave(rootLetterIdx) {
+        if (rootLetterIdx === 6) return 3;
+        if (rootLetterIdx >= 0 && rootLetterIdx <= 5) return 4;
+        return 3;
+    }
+
+    function generateMajorScale(rootLetterIdx, show7ths) {
+        const notes = [];
+        const baseOct = getLowestBOctave(rootLetterIdx);
+        const triads = ["I", "ii", "iii", "IV", "V", "vi", "vii°", "I"];
+        const sevenths = ["Imaj7", "ii7", "iii7", "IVmaj7", "V7", "vi7", "m7b5", "Imaj7"];
+        const labels = show7ths ? sevenths : triads;
+
+        for (let i = 0; i < 8; i++) {
+            const totalL = rootLetterIdx + i;
+            const lIdx = totalL % 7;
+            let octave = baseOct + Math.floor(totalL / 7);
+            if (octave < 3 || (octave === 3 && lIdx < 6)) octave += 1;
+
+            notes.push({
+                keys: [`${LETTERS[lIdx]}/${octave}`],
+                triad: labels[i]
+            });
+        }
+        return notes;
+    }
+
+    function generateMelodicMinorUp(minRootLetterIdx, accCount, show7ths) {
+        const notes = [];
+        const baseOct = getLowestBOctave(minRootLetterIdx);
+        const triads = ["i", "ii", "III+", "IV", "V", "vi°", "vii°", "i"];
+        const sevenths = ["im(maj7)", "ii7", "III+maj7", "IV7", "V7", "viø7", "viiø7", "im(maj7)"];
+        const labels = show7ths ? sevenths : triads;
+
+        for (let i = 0; i < 8; i++) {
+            const totalL = minRootLetterIdx + i;
+            const lIdx = totalL % 7;
+            let octave = baseOct + Math.floor(totalL / 7);
+            if (octave < 3 || (octave === 3 && lIdx < 6)) octave += 1;
+
+            const noteObj = {
+                keys: [`${LETTERS[lIdx]}/${octave}`],
+                triad: labels[i]
+            };
+            if (i === 5 || i === 6) {
+                noteObj.acc = [getRaisedAccidental(lIdx, accCount)];
+            }
+            notes.push(noteObj);
+        }
+        return notes;
+    }
+
+    function generateHarmonicMinorDown(minRootLetterIdx, accCount, show7ths) {
+        const notes = [];
+        const baseOct = getLowestBOctave(minRootLetterIdx);
+        const topL = minRootLetterIdx + 7;
+        const triads = ["i", "vii°", "VI", "V", "iv", "III", "ii°", "i"];
+        const sevenths = ["im(maj7)", "vii°7", "VImaj7", "V7", "iv7", "III+maj7", "iiø7", "im(maj7)"];
+        const labels = show7ths ? sevenths : triads;
+
+        for (let i = 0; i < 8; i++) {
+            const totalL = topL - i;
+            const lIdx = ((totalL % 7) + 7) % 7;
+            let octave = baseOct + Math.floor(totalL / 7);
+            if (octave < 3 || (octave === 3 && lIdx < 6)) octave += 1;
+
+            const noteObj = {
+                keys: [`${LETTERS[lIdx]}/${octave}`],
+                triad: labels[i]
+            };
+            if (i === 1) {
+                noteObj.acc = [getRaisedAccidental(lIdx, accCount)];
+            }
+            notes.push(noteObj);
+        }
+        return notes;
+    }
+
+    function buildCadenceChord(scaleDegNotes, degreeIndices, label="", raisedDeg=null, accCount=0, minRootLetterIdx=0) {
+        const keys = [];
+        const accs = [];
+
+        for (const deg of degreeIndices) {
+            const note = scaleDegNotes[deg];
+            const parts = note.keys[0].split("/");
+            const pitch = parts[0];
+            let octave = parseInt(parts[1], 10);
+            if (octave < 4) octave += 1;
+
+            keys.push(`${pitch}/${octave}`);
+
+            if (raisedDeg !== null && deg === raisedDeg) {
+                const lIdx = (minRootLetterIdx + deg) % 7;
+                accs.push(getRaisedAccidental(lIdx, accCount));
+            } else {
+                accs.push("");
+            }
+        }
+
+        const res = { keys, label };
+        if (accs.some(a => a !== "")) res.acc = accs;
+        return res;
+    }
+
+    function computeKeyData(accCount, show7ths) {
+        const keyInfo = KEY_NAMES[accCount];
+        const majName = keyInfo[0];
+        const minName = keyInfo[1];
+
+        const majRootLetter = ((accCount * 4) % 7 + 7) % 7;
+        const minRootLetter = (majRootLetter + 5) % 7;
+
+        const majScale = generateMajorScale(majRootLetter, show7ths);
+        const minUp = generateMelodicMinorUp(minRootLetter, accCount, show7ths);
+        const minDown = generateHarmonicMinorDown(minRootLetter, accCount, show7ths);
+
+        const mDeg = generateMajorScale(majRootLetter, show7ths);
+        const nDeg = generateMajorScale(minRootLetter, show7ths);
+
+        const cIndices = show7ths ? [4, 6, 1, 3] : [4, 6, 1];
+        const tIndices = show7ths ? [0, 2, 4, 6] : [0, 2, 4];
+        const subIndices = show7ths ? [3, 5, 0, 2] : [3, 5, 0];
+        const viIndices = show7ths ? [5, 7, 2, 4] : [5, 7, 2];
+
+        const vLbl = show7ths ? "V7" : "V";
+        const iLbl = show7ths ? "Imaj7" : "I";
+        const ivLbl = show7ths ? "IVmaj7" : "IV";
+        const viLbl = show7ths ? "vi7" : "vi";
+
+        const minVLbl = show7ths ? "V7" : "V";
+        const minILbl = show7ths ? "i7" : "i";
+        const minIvLbl = show7ths ? "iv7" : "iv";
+        const minViLbl = show7ths ? "VImaj7" : "VI";
+
+        const majCadences = [
+            [buildCadenceChord(mDeg, cIndices, vLbl), buildCadenceChord(mDeg, tIndices, iLbl)],
+            [buildCadenceChord(mDeg, subIndices, ivLbl), buildCadenceChord(mDeg, tIndices, iLbl)],
+            [buildCadenceChord(mDeg, cIndices, vLbl), buildCadenceChord(mDeg, viIndices, viLbl)],
+            [buildCadenceChord(mDeg, tIndices, iLbl), buildCadenceChord(mDeg, cIndices, vLbl)]
+        ];
+
+        const minCadences = [
+            [
+                buildCadenceChord(nDeg, cIndices, minVLbl, 6, accCount, minRootLetter),
+                buildCadenceChord(nDeg, tIndices, minILbl)
+            ],
+            [
+                buildCadenceChord(nDeg, subIndices, minIvLbl),
+                buildCadenceChord(nDeg, tIndices, minILbl)
+            ],
+            [
+                buildCadenceChord(nDeg, cIndices, minVLbl, 6, accCount, minRootLetter),
+                buildCadenceChord(nDeg, viIndices, minViLbl)
+            ],
+            [
+                buildCadenceChord(nDeg, tIndices, minILbl),
+                buildCadenceChord(nDeg, cIndices, minVLbl, 6, accCount, minRootLetter)
+            ]
+        ];
+
+        return {
+            key_sig: majName,
+            maj_title: `${majName} Major Scale`,
+            min_title: `${minName} Minor Scale`,
+            maj_scale: majScale,
+            min_up: minUp,
+            min_down: minDown,
+            maj_cadences: majCadences,
+            min_cadences: minCadences
+        };
+    }
+
+    function drawBeamedMeasure(ctx, stave, notesData, scaleTitle) {
+        const { StaveNote, Accidental, Voice, Formatter, Beam } = Vex.Flow;
+
+        const notes = notesData.map(item => {
+            const note = new StaveNote({
+                keys: item.keys,
+                duration: "8",
+                clef: "treble",
+                stem_direction: 1
+            });
+            if (item.acc) {
+                item.acc.forEach((a, i) => {
+                    if (a) note.addModifier(new Accidental(a), i);
+                });
+            }
+            return note;
+        });
+
+        const beam = new Beam(notes);
+        const voice = new Voice({ num_beats: 4, beat_value: 4 }).setStrict(false).addTickables(notes);
+
+        new Formatter().joinVoices([voice]).format([voice], stave.getWidth() - 90);
+
+        voice.draw(ctx, stave);
+        beam.setContext(ctx).draw();
+
+        const triadY = stave.getYForLine(9.0);
+        ctx.save();
+        ctx.setFont("sans-serif", 11, "bold");
+        notes.forEach((note, i) => {
+            if (notesData[i].triad) {
+                const text = notesData[i].triad;
+                const x = note.getAbsoluteX();
+                const offset = text.length * 3;
+                ctx.fillText(text, x - offset, triadY);
+            }
+        });
+        ctx.restore();
+
+        const titleY = stave.getYForLine(11.8);
+        ctx.save();
+        ctx.setFont("sans-serif", 12, "bold");
+        ctx.fillText(scaleTitle, stave.getX() + 10, titleY);
+        ctx.restore();
+    }
+
+    function drawCadenceRow(ctx, cadenceData, startY, modeLabel, keySig, availWidth) {
+        const cadenceTitles = ["Authentic Cadence", "Plagal Cadence", "Deceptive Cadence", "Half Cadence"];
+        const rowHeight = 185;
+        const margin = 10;
+        const colGap = 24;
+        
+        const fullColWidth = Math.floor((availWidth - 20 - colGap) / 2);
+        const barWidth = Math.min(220, fullColWidth);
+
+        let currentY = startY;
+
+        for (let r = 0; r < 2; r++) {
+            for (let c = 0; c < 2; c++) {
+                const idx = r * 2 + c;
+                const xPos = margin + c * (fullColWidth + colGap);
+
+                const stave = new Vex.Flow.Stave(xPos, currentY, barWidth);
+                stave.addClef("treble").addKeySignature(keySig);
+
+                ctx.save();
+                ctx.setFont("sans-serif", 11, "bold");
+                ctx.fillText(`${cadenceTitles[idx]} (${modeLabel})`, stave.getX() + 10, stave.getYForLine(-3.2));
+                ctx.restore();
+
+                stave.setContext(ctx).draw();
+
+                const chords = cadenceData[idx].map(item => {
+                    const note = new Vex.Flow.StaveNote({ keys: item.keys, duration: "w", clef: "treble" });
+                    if (item.acc) {
+                        item.acc.forEach((a, i) => {
+                            if (a) note.addModifier(new Vex.Flow.Accidental(a), i);
+                        });
+                    }
+                    return note;
+                });
+
+                const voice = new Vex.Flow.Voice({ num_beats: 8, beat_value: 4 }).setStrict(false).addTickables(chords);
+                const availableFormatWidth = barWidth - 70;
+                new Vex.Flow.Formatter().joinVoices([voice]).format([voice], Math.max(availableFormatWidth, 50));
+                voice.draw(ctx, stave);
+
+                const labelY = stave.getYForLine(11.2);
+                ctx.save();
+                ctx.setFont("sans-serif", 10, "bold");
+                chords.forEach((chord, i) => {
+                    if (cadenceData[idx][i].label) {
+                        const text = cadenceData[idx][i].label;
+                        const x = chord.getAbsoluteX();
+                        const offset = text.length * 2.5;
+                        ctx.fillText(text, x - offset, labelY);
+                    }
+                });
+                ctx.restore();
+            }
+
+            if (r === 0) {
+                const midRowY = currentY + rowHeight - 25;
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([4, 4]);
+                ctx.moveTo(10, midRowY);
+                ctx.lineTo(availWidth - 10, midRowY);
+                ctx.setStrokeStyle("#e2e8f0");
+                ctx.setLineWidth(1);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            currentY += rowHeight;
+        }
+        return currentY;
+    }
+
+    function renderAll() {
+        if (typeof Vex === 'undefined' || !Vex.Flow) return;
+
+        const data = computeKeyData(currentAccidentals, showSevenths);
+
+        const majDiv = document.getElementById("major-score");
+        if (!majDiv) return;
+        majDiv.innerHTML = "";
+        const availWidth = Math.max(majDiv.clientWidth - 10, 320);
+        const halfWidth = Math.floor((availWidth - 30) / 2);
+
+        // 1. Major Scale
+        const renderer1 = new Vex.Flow.Renderer(majDiv, Vex.Flow.Renderer.Backends.SVG);
+        renderer1.resize(availWidth, 160);
+        const ctx1 = renderer1.getContext();
+
+        const sMaj = new Vex.Flow.Stave(10, 15, halfWidth);
+        sMaj.addClef("treble").addKeySignature(data.key_sig);
+        sMaj.setContext(ctx1).draw();
+        drawBeamedMeasure(ctx1, sMaj, data.maj_scale, `${data.maj_title} (Ascending)`);
+
+        // 2. Minor Scale
+        const minDiv = document.getElementById("minor-score");
+        if (!minDiv) return;
+        minDiv.innerHTML = "";
+
+        const stackMinorTwoLines = availWidth < 850;
+        const minHeight = stackMinorTwoLines ? 320 : 160;
+
+        const renderer2 = new Vex.Flow.Renderer(minDiv, Vex.Flow.Renderer.Backends.SVG);
+        renderer2.resize(availWidth, minHeight);
+        const ctx2 = renderer2.getContext();
+
+        if (stackMinorTwoLines) {
+            const sMin1 = new Vex.Flow.Stave(10, 15, halfWidth);
+            sMin1.addClef("treble").addKeySignature(data.key_sig);
+            sMin1.setContext(ctx2).draw();
+            drawBeamedMeasure(ctx2, sMin1, data.min_up, `${data.min_title} (Melodic Up)`);
+
+            const sMin2 = new Vex.Flow.Stave(10, 160, halfWidth);
+            sMin2.addClef("treble").addKeySignature(data.key_sig);
+            sMin2.setContext(ctx2).draw();
+            drawBeamedMeasure(ctx2, sMin2, data.min_down, `${data.min_title} (Harmonic Down)`);
+        } else {
+            const sMin1 = new Vex.Flow.Stave(10, 15, halfWidth);
+            sMin1.addClef("treble").addKeySignature(data.key_sig);
+            sMin1.setContext(ctx2).draw();
+            drawBeamedMeasure(ctx2, sMin1, data.min_up, `${data.min_title} (Melodic Up)`);
+
+            const sMin2 = new Vex.Flow.Stave(20 + halfWidth, 15, halfWidth);
+            sMin2.addClef("treble").addKeySignature(data.key_sig);
+            sMin2.setContext(ctx2).draw();
+            drawBeamedMeasure(ctx2, sMin2, data.min_down, `${data.min_title} (Harmonic Down)`);
+        }
+
+        // 3. Cadences
+        const cadDiv = document.getElementById("cadences-score");
+        if (!cadDiv) return;
+        cadDiv.innerHTML = "";
+
+        const renderer3 = new Vex.Flow.Renderer(cadDiv, Vex.Flow.Renderer.Backends.SVG);
+        renderer3.resize(availWidth, 850);
+        const ctx3 = renderer3.getContext();
+
+        let nextY = drawCadenceRow(ctx3, data.maj_cadences, 35, "Major", data.key_sig, availWidth);
+
+        const lineY = nextY - 10;
+        ctx3.save();
+        ctx3.beginPath();
+        ctx3.moveTo(10, lineY);
+        ctx3.lineTo(availWidth - 10, lineY);
+        ctx3.setStrokeStyle("#94a3b8");
+        ctx3.setLineWidth(2);
+        ctx3.stroke();
+        ctx3.restore();
+
+        nextY = drawCadenceRow(ctx3, data.min_cadences, lineY + 55, "Minor", data.key_sig, availWidth);
+
+        const cadSvg = cadDiv.querySelector("svg");
+        if (cadSvg) {
+            cadSvg.setAttribute("height", nextY + 10);
+        }
+    }
+
+    function initUI() {
+        const select = document.getElementById("key-select");
+        if (!select) return;
+
+        select.innerHTML = "";
+        for (let acc = -7; acc <= 7; acc++) {
+            const opt = document.createElement("option");
+            opt.value = acc;
+            opt.textContent = formatLabel(acc);
+            if (acc === currentAccidentals) opt.selected = true;
+            select.appendChild(opt);
+        }
+
+        select.addEventListener("change", (e) => {
+            currentAccidentals = parseInt(e.target.value, 10);
+            renderAll();
+        });
+
+        const setAcc = (val) => {
+            if (val >= -7 && val <= 7) {
+                currentAccidentals = val;
+                select.value = val;
+                renderAll();
+            }
+        };
+
+        document.getElementById("btn-m2").addEventListener("click", () => setAcc(currentAccidentals - 2));
+        document.getElementById("btn-m1").addEventListener("click", () => setAcc(currentAccidentals - 1));
+        document.getElementById("btn-p1").addEventListener("click", () => setAcc(currentAccidentals + 1));
+        document.getElementById("btn-p2").addEventListener("click", () => setAcc(currentAccidentals + 2));
+
+        const toggleBtn = document.getElementById("btn-toggle-sevenths");
+        toggleBtn.addEventListener("click", () => {
+            showSevenths = !showSevenths;
+            toggleBtn.textContent = showSevenths ? "Show Triads" : "Show 7th Chords";
+            renderAll();
+        });
+
+        window.addEventListener("resize", renderAll);
+        renderAll();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUI);
+    } else {
+        initUI();
+    }
+
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .catch(err => console.log('Service Worker skipped or failed:', err));
+        });
+    }
+</script>
+</body>
+</html>
