@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Tonality">
-    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.svg">
     <meta name="theme-color" content="#2563eb">
 
     <!-- VexFlow Library -->
@@ -501,13 +501,13 @@
         sMaj.setContext(ctx1).draw();
         drawBeamedMeasure(ctx1, sMaj, data.maj_scale, `${data.maj_title} (Ascending)`);
 
-        // 2. Minor Scale
+        // 2. Minor Scale (Expanded vertical height and stave offset to prevent collision)
         const minDiv = document.getElementById("minor-score");
         if (!minDiv) return;
         minDiv.innerHTML = "";
 
         const stackMinorTwoLines = availWidth < 850;
-        const minHeight = stackMinorTwoLines ? 320 : 160;
+        const minHeight = stackMinorTwoLines ? 360 : 160;
 
         const renderer2 = new Vex.Flow.Renderer(minDiv, Vex.Flow.Renderer.Backends.SVG);
         renderer2.resize(availWidth, minHeight);
@@ -519,7 +519,8 @@
             sMin1.setContext(ctx2).draw();
             drawBeamedMeasure(ctx2, sMin1, data.min_up, `${data.min_title} (Melodic Up)`);
 
-            const sMin2 = new Vex.Flow.Stave(10, 160, halfWidth);
+            // Offset updated to 190 to clear title text completely
+            const sMin2 = new Vex.Flow.Stave(10, 190, halfWidth);
             sMin2.addClef("treble").addKeySignature(data.key_sig);
             sMin2.setContext(ctx2).draw();
             drawBeamedMeasure(ctx2, sMin2, data.min_down, `${data.min_title} (Harmonic Down)`);
