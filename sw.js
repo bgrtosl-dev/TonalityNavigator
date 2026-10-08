@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tonality-pwa-v2'; // Bump version when updating index.html
+const CACHE_NAME = 'tonality-pwa-v3'; // Bump version when updating index.html
 const ASSETS = [
     './',
     './index.html',
